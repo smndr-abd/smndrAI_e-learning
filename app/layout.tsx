@@ -15,6 +15,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { data: profile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const isAdmin = profile?.role === "admin";
+
   return (
     <html lang="en">
       <head>
@@ -37,6 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <>
                   <span className="who">{user.email}</span>
                   <Link href="/dashboard">My courses</Link>
+                  {isAdmin && <Link href="/admin">Admin</Link>}
                   <form action={signOut}>
                     <button className="btn link" type="submit">Log out</button>
                   </form>
