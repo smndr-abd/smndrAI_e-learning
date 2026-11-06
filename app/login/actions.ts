@@ -36,3 +36,50 @@ export async function signOut() {
   await supabase.auth.signOut();
   redirect("/");
 }
+
+// ---------- Forgot / reset password ----------
+
+export async function requestPasswordReset(formData: FormData) {
+  const supabase = createClient();
+  const email = String(formData.get("email") ?? "").trim();
+  const origin = headers().get("origin") ?? "http://localhost:3000";
+
+  if (email) {
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${origin}/auth/reset`,
+    });
+  }
+  // Same message whether or not the email has an account, so nobody can
+  // use this form to find out who is registered.
+  redirect(
+    `/forgot-password?message=${encodeURIComponent(
+      "If that email has an account, a reset link is on its way."
+    )}`
+  );
+}
+
+export async function updatePassword(formData: FormData) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect(
+      `/forgot-password?error=${encodeURIComponent("Your reset link expired. Request a new one.")}`
+    );
+  }
+
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  if (password.length < 6) {
+    redirect(`/reset-password?error=${encodeURIComponent("Use at least 6 characters.")}`);
+  }
+  if (password !== confirm) {
+    redirect(`/reset-password?error=${encodeURIComponent("The two passwords do not match.")}`);
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) redirect(`/reset-password?error=${encodeURIComponent(error.message)}`);
+
+  redirect("/dashboard");
+}
