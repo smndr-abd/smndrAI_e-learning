@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { login, signup } from "./actions";
 
 export default function LoginPage({
@@ -13,6 +14,10 @@ export default function LoginPage({
 
       {searchParams.error && <div className="notice error">{searchParams.error}</div>}
       {searchParams.message && <div className="notice ok">{searchParams.message}</div>}
+
+      <p className="muted" style={{ marginTop: 18, marginBottom: 0 }}>
+          <Link href="/forgot-password">Forgot your password?</Link>
+        </p>
 
       <form className="card">
         <label>
