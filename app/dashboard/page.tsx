@@ -9,6 +9,8 @@ export default async function Dashboard() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+
   const { data: enrollments } = await supabase
     .from("enrollments")
     .select("course_id, courses(id, slug, title)");
@@ -33,6 +35,7 @@ export default async function Dashboard() {
     <>
       <div className="eyebrow">Operator console</div>
       <h1 className="glitch" data-text="My courses">My courses</h1>
+      <p className="muted">Signed in as {user.email} // role: {profile?.role ?? "none"}</p>
       {cards.length === 0 && (
         <p className="muted">No active missions. <Link href="/">Browse courses</Link></p>
       )}

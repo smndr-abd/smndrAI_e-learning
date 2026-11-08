@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCourseOutline } from "@/lib/data";
+import { parseVideo } from "@/lib/video";
+import { formatBytes } from "@/lib/files";
+import { Linkified } from "@/lib/linkify";
 import { markComplete } from "@/app/courses/actions";
 
 export default async function LessonPage({
@@ -38,6 +41,15 @@ export default async function LessonPage({
     );
   }
 
+  const video = parseVideo(lesson.video_url);
+
+  // Same protection as the lesson: files come back only if the student may see the lesson.
+  const { data: files } = await supabase
+    .from("lesson_files")
+    .select("id, name, size_bytes")
+    .eq("lesson_id", lesson.id)
+    .order("created_at");
+
   return (
     <>
       <p className="crumb"><Link href={`/courses/${params.slug}`}>&larr; {data.course.title}</Link></p>
@@ -46,9 +58,24 @@ export default async function LessonPage({
       </div>
       <h1 className="glitch" data-text={lesson.title}>{lesson.title}</h1>
 
-      {lesson.video_url && (
+      {video?.kind === "iframe" && (
+        <div className="video">
+          <iframe
+            src={video.src}
+            title={lesson.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+      )}
+      {video?.kind === "file" && (
+        <video className="video-file" controls preload="metadata" src={video.src} />
+      )}
+      {video?.kind === "link" && (
         <p>
-          <a className="btn secondary" href={lesson.video_url} target="_blank" rel="noreferrer">
+          <a className="btn secondary" href={video.src} target="_blank" rel="noreferrer">
             Watch the video
           </a>
         </p>
@@ -57,11 +84,27 @@ export default async function LessonPage({
       <div className="card">
         <div className="term-head"><b>root@academy</b>:~$ cat lesson.md</div>
         {lesson.content_md ? (
-          <pre className="content">{lesson.content_md}</pre>
+          <pre className="content"><Linkified text={lesson.content_md} /></pre>
         ) : (
-          <p className="muted">Lesson content coming soon. Add text in the content_md column.</p>
+          <p className="muted">Lesson notes coming soon.</p>
         )}
       </div>
+
+      {(files ?? []).length > 0 && (
+        <div className="card">
+          <h3>Downloads</h3>
+          <ul className="files">
+            {(files ?? []).map((f) => (
+              <li key={f.id}>
+                <span>
+                  <a href={`/files/${f.id}`}>{f.name}</a>
+                  <span className="file-meta"> {formatBytes(f.size_bytes)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <form action={markComplete}>
         <input type="hidden" name="lessonId" value={lesson.id} />

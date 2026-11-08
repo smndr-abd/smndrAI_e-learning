@@ -23,6 +23,9 @@ export default async function CoursePage({
 
   let enrolled = false;
   let done = new Set<string>();
+  const quizByModule: Record<string, { id: string; title: string }> = {};
+  const bestScore: Record<string, number> = {};
+  const passedQuiz: Record<string, boolean> = {};
   if (user) {
     const { data: e } = await supabase
       .from("enrollments")
@@ -32,6 +35,15 @@ export default async function CoursePage({
     enrolled = !!e;
     const { data: p } = await supabase.from("lesson_progress").select("lesson_id");
     done = new Set((p ?? []).map((r) => r.lesson_id as string));
+
+    // Quizzes are only returned for enrolled students (RLS).
+    const { data: qz } = await supabase.from("quizzes").select("id, module_id, title");
+    for (const q of qz ?? []) quizByModule[q.module_id] = { id: q.id, title: q.title };
+    const { data: at } = await supabase.from("quiz_attempts").select("quiz_id, score, passed");
+    for (const a of at ?? []) {
+      bestScore[a.quiz_id] = Math.max(bestScore[a.quiz_id] ?? 0, Number(a.score));
+      if (a.passed) passedQuiz[a.quiz_id] = true;
+    }
   }
 
   const flat = modules.flatMap((m) => m.lessons);
@@ -97,6 +109,18 @@ export default async function CoursePage({
               );
             })}
           </ul>
+          {quizByModule[m.id] && (
+            <div className="row" style={{ marginTop: 14 }}>
+              <Link className="btn secondary" href={`/courses/${course.slug}/quiz/${quizByModule[m.id].id}`}>
+                Take checkpoint quiz
+              </Link>
+              {passedQuiz[quizByModule[m.id].id] ? (
+                <span className="badge done">Passed {bestScore[quizByModule[m.id].id]}%</span>
+              ) : bestScore[quizByModule[m.id].id] !== undefined ? (
+                <span className="badge">Best {bestScore[quizByModule[m.id].id]}%</span>
+              ) : null}
+            </div>
+          )}
         </div>
       ))}
     </>
