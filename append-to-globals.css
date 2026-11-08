@@ -1,0 +1,26 @@
+
+/* ===== quiz rules + downloads (appended) ===== */
+input[type="radio"] { width: auto; margin: 0 12px 0 0; accent-color: var(--magenta); flex: none; }
+label.opt {
+  display: flex; align-items: flex-start; gap: 0; cursor: pointer;
+  text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--fg);
+  padding: 10px 14px; margin: 8px 0;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, .3);
+  transition: border-color .15s, background .15s;
+}
+label.opt:hover { border-color: var(--cyan); background: rgba(0, 240, 255, .06); }
+div.opt { padding: 10px 14px; margin: 8px 0; border: 1px solid var(--line); background: rgba(0, 0, 0, .3); }
+div.opt.right { border-color: var(--green); background: rgba(57, 255, 136, .08); }
+div.opt.wrong { border-color: var(--magenta); background: rgba(255, 43, 214, .1); }
+.q-num { font-family: var(--font-display); color: var(--magenta); letter-spacing: .12em; font-size: 12px; text-transform: uppercase; }
+.score { font-family: var(--font-display); font-size: 56px; font-weight: 900; color: var(--yellow); text-shadow: 0 0 22px rgba(246, 233, 74, .5); line-height: 1; }
+.score.fail { color: var(--magenta); text-shadow: 0 0 22px rgba(255, 43, 214, .5); }
+.explain { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
+.notice.warn { border-color: var(--yellow); background: rgba(246, 233, 74, .08); color: #fff6a8; }
+.notice.warn::before { content: "HEADS UP // "; font-weight: 700; color: var(--yellow); }
+
+ul.files { list-style: none; padding: 0; margin: 12px 0 0; }
+ul.files li { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px dashed rgba(0, 240, 255, .2); }
+.file-meta { color: var(--muted); font-size: 12px; letter-spacing: .06em; }
+input[type="file"] { padding: 10px; }
+pre.content a { text-decoration: underline; word-break: break-all; }
