@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { submitQuiz } from "@/app/courses/actions";
 import {
   PASS_MARK, RETRY_MARK, PENALTY_STEP, PENALTY_CAP, COOLDOWN_MINUTES,
-  quizState, outcome, type AttemptRow,
+  quizState, outcome, isAnswerCorrect, type AttemptRow,
 } from "@/lib/quiz";
 
 type Attempt = AttemptRow & { penalty: number | string | null };
@@ -26,7 +26,7 @@ export default async function QuizPage({
   // RLS: returns the quiz only if the student is enrolled in the course.
   const { data: quiz } = await supabase
     .from("quizzes")
-    .select("id, title")
+    .select("id, title, kind")
     .eq("id", params.quizId)
     .maybeSingle();
 
@@ -40,6 +40,9 @@ export default async function QuizPage({
     );
   }
 
+  const isCoding = quiz.kind === "coding";
+  const backHref = isCoding ? `/courses/${params.slug}/coding` : `/courses/${params.slug}`;
+  const backLabel = isCoding ? "Back to the Coding Lab" : "Back to the course";
   const admin = createAdminClient();
 
   // All earlier attempts (newest first) decide the penalty and the waiting time.
@@ -62,7 +65,7 @@ export default async function QuizPage({
     if (attempt && attempt.quiz_id === quiz.id) {
       const { data: questions } = await admin
         .from("quiz_questions")
-        .select("id, position, prompt, options, correct_index, explanation")
+        .select("id, position, prompt, code, qtype, options, correct_index, accepted, explanation")
         .eq("quiz_id", quiz.id)
         .order("position");
 
@@ -70,14 +73,14 @@ export default async function QuizPage({
       const rawScore = Number(attempt.raw_score ?? attempt.score);
       const penalty = Number(attempt.penalty ?? 0);
       const result = outcome(finalScore, rawScore);
-      const answers = (attempt.answers ?? {}) as Record<string, number | null>;
+      const answers = (attempt.answers ?? {}) as Record<string, number | string | null>;
 
       const title =
         result === "passed" ? "Checkpoint passed" : result === "retry" ? "Almost there" : "Review required";
 
       return (
         <>
-          <p className="crumb"><Link href={`/courses/${params.slug}`}>&larr; Back to the course</Link></p>
+          <p className="crumb"><Link href={backHref}>&larr; {backLabel}</Link></p>
           <div className="eyebrow">{quiz.title}</div>
           <h1 className="glitch" data-text={title}>{title}</h1>
 
@@ -103,7 +106,7 @@ export default async function QuizPage({
 
             <div className="row">
               {result === "passed" ? (
-                <Link className="btn" href={`/courses/${params.slug}`}>Continue course</Link>
+                <Link className="btn" href={backHref}>{isCoding ? "Back to the Coding Lab" : "Continue course"}</Link>
               ) : (
                 <>
                   {result === "retry" && (
@@ -118,22 +121,39 @@ export default async function QuizPage({
           <h2>Review</h2>
           {(questions ?? []).map((q, i) => {
             const picked = answers[q.id];
+            const right = isAnswerCorrect(q, picked);
             return (
               <div className="card" key={q.id}>
                 <div className="q-num">Question {i + 1}</div>
                 <p>{q.prompt}</p>
-                {(q.options as string[]).map((o, idx) => {
-                  const isRight = idx === q.correct_index;
-                  const isPicked = idx === picked;
-                  const cls = isRight ? "opt right" : isPicked ? "opt wrong" : "opt";
-                  return (
-                    <div className={cls} key={idx}>
-                      {isRight ? "✔ " : isPicked ? "✘ " : ""}
-                      {o}
-                      {isPicked && <span className="badge">Your answer</span>}
+                {q.code && <pre className="code"><code>{q.code}</code></pre>}
+
+                {q.qtype === "blank" ? (
+                  <>
+                    <div className={right ? "opt right" : "opt wrong"} style={{ fontFamily: "var(--font-mono)" }}>
+                      {right ? "✔ " : "✘ "}
+                      Your answer: {typeof picked === "string" && picked ? picked : "(left empty)"}
                     </div>
-                  );
-                })}
+                    {!right && (
+                      <div className="opt right" style={{ fontFamily: "var(--font-mono)" }}>
+                        Accepted: {(Array.isArray(q.accepted) ? (q.accepted as string[]) : []).join("  or  ")}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  (q.options as string[]).map((o, idx) => {
+                    const isRight = idx === q.correct_index;
+                    const isPicked = idx === picked;
+                    const cls = isRight ? "opt right" : isPicked ? "opt wrong" : "opt";
+                    return (
+                      <div className={cls} key={idx}>
+                        {isRight ? "✔ " : isPicked ? "✘ " : ""}
+                        {o}
+                        {isPicked && <span className="badge">Your answer</span>}
+                      </div>
+                    );
+                  })
+                )}
                 {q.explanation && <p className="explain">{q.explanation}</p>}
               </div>
             );
@@ -144,10 +164,10 @@ export default async function QuizPage({
   }
 
   // ---------- QUIZ PAGE (rules, history, form) ----------
-  // The correct answers are NOT selected here, so they never reach the browser.
+  // Correct answers and accepted answers are NOT selected here, so they never reach the browser.
   const { data: questions } = await admin
     .from("quiz_questions")
-    .select("id, position, prompt, options")
+    .select("id, position, prompt, code, qtype, options")
     .eq("quiz_id", quiz.id)
     .order("position");
 
@@ -155,8 +175,8 @@ export default async function QuizPage({
 
   return (
     <>
-      <p className="crumb"><Link href={`/courses/${params.slug}`}>&larr; Back to the course</Link></p>
-      <div className="eyebrow">Checkpoint</div>
+      <p className="crumb"><Link href={backHref}>&larr; {backLabel}</Link></p>
+      <div className="eyebrow">{isCoding ? "Coding lab" : "Checkpoint"}</div>
       <h1 className="glitch" data-text={quiz.title}>{quiz.title}</h1>
 
       <div className="card">
@@ -168,12 +188,13 @@ export default async function QuizPage({
             earlier failed attempt (max -{PENALTY_CAP}). A perfect score always passes.
           </li>
           <li>Below {RETRY_MARK}%: review the lessons and wait {COOLDOWN_MINUTES} minutes before retrying.</li>
+          {isCoding && <li>Typed answers: capital letters matter, just like in Python.</li>}
         </ul>
       </div>
 
       {state.passedBefore && (
         <div className="notice ok">
-          You already passed this checkpoint (best {bestPassed}%). Retakes are practice only and never lower your result.
+          You already passed this quiz (best {bestPassed}%). Retakes are practice only and never lower your result.
         </div>
       )}
       {!state.passedBefore && state.penalty > 0 && state.waitMinutes === 0 && (
@@ -218,12 +239,28 @@ export default async function QuizPage({
               <div className="card" key={q.id}>
                 <div className="q-num">Question {i + 1}</div>
                 <p>{q.prompt}</p>
-                {(q.options as string[]).map((o, idx) => (
-                  <label className="opt" key={idx}>
-                    <input type="radio" name={`q_${q.id}`} value={idx} required />
-                    <span>{o}</span>
-                  </label>
-                ))}
+                {q.code && <pre className="code"><code>{q.code}</code></pre>}
+
+                {q.qtype === "blank" ? (
+                  <input
+                    name={`q_${q.id}`}
+                    type="text"
+                    required
+                    maxLength={200}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    placeholder="type the missing code"
+                    style={{ fontFamily: "var(--font-mono)", marginBottom: 0 }}
+                  />
+                ) : (
+                  (q.options as string[]).map((o, idx) => (
+                    <label className="opt" key={idx}>
+                      <input type="radio" name={`q_${q.id}`} value={idx} required />
+                      <span>{o}</span>
+                    </label>
+                  ))
+                )}
               </div>
             ))}
             <button className="btn" type="submit">Submit answers</button>

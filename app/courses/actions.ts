@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PASS_MARK, quizState, type AttemptRow } from "@/lib/quiz";
+import { PASS_MARK, quizState, isAnswerCorrect, type AttemptRow } from "@/lib/quiz";
 
 // Free enrollment. The price is checked HERE on the server, so nobody can
 // enroll in a paid course by editing the form in their browser.
@@ -83,16 +83,17 @@ export async function submitQuiz(formData: FormData) {
 
   const { data: questions } = await admin
     .from("quiz_questions")
-    .select("id, correct_index")
+    .select("id, correct_index, qtype, accepted")
     .eq("quiz_id", quizId);
 
-  const answers: Record<string, number | null> = {};
+  const answers: Record<string, number | string | null> = {};
   let correct = 0;
   for (const q of questions ?? []) {
     const raw = formData.get(`q_${q.id}`);
-    const picked = raw === null ? null : Number(raw);
+    let picked: number | string | null = null;
+    if (raw !== null) picked = q.qtype === "blank" ? String(raw).slice(0, 200) : Number(raw);
     answers[q.id] = picked;
-    if (picked === q.correct_index) correct++;
+    if (isAnswerCorrect(q, picked)) correct++;
   }
   const total = (questions ?? []).length;
   const rawScore = total ? Math.round((correct / total) * 100) : 0;

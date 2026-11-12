@@ -37,7 +37,7 @@ export default async function CoursePage({
     done = new Set((p ?? []).map((r) => r.lesson_id as string));
 
     // Quizzes are only returned for enrolled students (RLS).
-    const { data: qz } = await supabase.from("quizzes").select("id, module_id, title");
+    const { data: qz } = await supabase.from("quizzes").select("id, module_id, title").eq("kind", "concept");
     for (const q of qz ?? []) quizByModule[q.module_id] = { id: q.id, title: q.title };
     const { data: at } = await supabase.from("quiz_attempts").select("quiz_id, score, passed");
     for (const a of at ?? []) {
@@ -66,11 +66,14 @@ export default async function CoursePage({
             <p className="muted" style={{ marginTop: 10 }}>
               SYNC {pct}% // {completed} of {flat.length} lessons complete
             </p>
-            {nextLesson && (
-              <Link className="btn" href={`/courses/${course.slug}/lessons/${nextLesson.id}`}>
-                {completed === 0 ? "Start mission" : "Continue mission"}
-              </Link>
-            )}
+            <div className="row">
+              {nextLesson && (
+                <Link className="btn" href={`/courses/${course.slug}/lessons/${nextLesson.id}`}>
+                  {completed === 0 ? "Start mission" : "Continue mission"}
+                </Link>
+              )}
+              <Link className="btn secondary" href={`/courses/${course.slug}/coding`}>Coding lab</Link>
+            </div>
           </>
         ) : course.price_cents === 0 ? (
           <form action={enroll} className="row">
