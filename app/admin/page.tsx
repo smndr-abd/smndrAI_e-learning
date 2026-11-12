@@ -29,6 +29,7 @@ export default async function AdminHome({
       <div className="eyebrow">Admin console</div>
       <h1 className="glitch" data-text="Course manager">Course manager</h1>
       <p className="muted">Pick a lesson to add its video and text, or add a new lesson to a phase.</p>
+      <p><Link className="btn secondary" href="/admin/results">Student results</Link></p>
       {searchParams.error && <div className="notice error">{searchParams.error}</div>}
 
       {(courses ?? []).map((c) => (
