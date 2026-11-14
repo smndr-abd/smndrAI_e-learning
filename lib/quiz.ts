@@ -36,3 +36,26 @@ export function outcome(finalScore: number, rawScore: number): "passed" | "retry
   if (rawScore >= RETRY_MARK) return "retry";
   return "review";
 }
+
+// ===== ANSWER CHECKING (used when grading AND in the results dashboard) =====
+export type QuestionForGrading = {
+  qtype?: string | null;       // 'choice' (pick one) or 'blank' (type the missing code)
+  correct_index: number;
+  accepted?: unknown;          // list of accepted typed answers
+};
+
+export function normalizeAnswer(s: string) {
+  return s.trim().replace(/\s+/g, " ");
+}
+
+export function isAnswerCorrect(q: QuestionForGrading, answer: unknown): boolean {
+  if (q.qtype === "blank") {
+    if (typeof answer !== "string") return false;
+    const given = normalizeAnswer(answer);
+    if (!given) return false;
+    const list = Array.isArray(q.accepted) ? (q.accepted as unknown[]).map(String) : [];
+    // Python is case sensitive, so typed answers are too.
+    return list.some((x) => normalizeAnswer(x) === given);
+  }
+  return typeof answer === "number" && answer === q.correct_index;
+}
