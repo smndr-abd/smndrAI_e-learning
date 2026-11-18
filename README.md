@@ -9,6 +9,8 @@ panel and sees every student's quiz results in a dashboard.
 
 Live site: https://smndr-ai-e-learning.vercel.app
 
+# Created by Samandar Abdujabbar
+
 ---
 
 ## Contents
